@@ -12,6 +12,7 @@ Once the data is stored in the EONET_DB, it is then extracted and transformed in
     
     Wildfires
     Severe Storms
+    landslides
     
 Both dataframes will be subsetted to the current month period only. The subsetting data is then saved on individual sheets inside a xlsx file. 
 which is saved within the temp folder.
@@ -242,20 +243,30 @@ def load_data():
         conn.commit()
     else:
         print ('FAILURE TO COONNECT TO API :: CHECK CONNECTION')
-def plotmaps(df_WF, df_SS):
+        
+        
+        
+def plotmaps(df_WF, df_SS, df_LS):
     fig, ax = plt.subplots()
     fig.set_size_inches(40, 20)
     world = gdp.read_file(gdp.datasets.get_path('naturalearth_lowres'))
     ax.set_aspect('equal')
     world.plot(ax=ax, color = 'white', edgecolor='grey')
-    #world = world[['continent', 'geometry', 'pop_est']]
-    geometry = [Point(xy) for xy in zip(df_WF.Longitude.astype(float), df_WF.Latitude.astype(float))]
-    geometry_SS = [Point(xy) for xy in zip(df_SS.Longitude.astype(float), df_SS.Latitude.astype(float))]
     crs = {'init': 'WSG:84'}
-    geo_df = GeoDataFrame(df_WF, crs=crs, geometry=geometry)
-    geo_ss = GeoDataFrame(df_SS, crs=crs, geometry=geometry_SS)
-    geo_ss.plot(ax=ax,column='TITLE', marker='o', markersize=5)
-    geo_df.plot(ax=ax, color='red',marker='X', markersize=5)
+    #world = world[['continent', 'geometry', 'pop_est']]
+    if len(df_WF) > 0:
+        geometry = [Point(xy) for xy in zip(df_WF.Longitude.astype(float), df_WF.Latitude.astype(float))]
+        geo_df = GeoDataFrame(df_WF, crs=crs, geometry=geometry)
+        geo_df.plot(ax=ax, color='red',marker='X', markersize=5)
+    if len(df_SS) > 0:    
+        geometry_SS = [Point(xy) for xy in zip(df_SS.Longitude.astype(float), df_SS.Latitude.astype(float))]
+        geo_ss = GeoDataFrame(df_SS, crs=crs, geometry=geometry_SS)
+        geo_ss.plot(ax=ax,column='TITLE', marker='o', markersize=5)
+    if len(df_LS) > 0:
+        geometry_LS = [Point(xy) for xy in zip(df_LS.Longitude.astype(float), df_LS.Latitude.astype(float))]
+        geo_ls = GeoDataFrame(df_LS, crs=crs, geometry=geometry_LS)
+        geo_ls.plot(ax=ax, color='black',marker='*', markersize=5)
+    
     plt.axis('off')
     ax.legend()
     plt.title('Earth Observations for the Period ' + (datetime.datetime.now() - dateutil.relativedelta.relativedelta(months=1)).strftime('%d %B %Y  %H:%M') + ' untill '+ datetime.datetime.now().strftime('%d %B %Y %H:%M'), fontsize=20)
@@ -270,16 +281,26 @@ def report():
     df['DATE'] = pandas.to_datetime(df.DATE, yearfirst = True, errors='coerce')
     #print (df['DATE'].dtype)
     df_WF = df[(df.Category == 'Wildfires') & (df.DATE >= datetime.datetime.now() - dateutil.relativedelta.relativedelta(months=1))]
-    df_WF['Longitude'] = pandas.to_numeric(df_WF.Longitude, errors = 'coerce')
-    df_WF['Latitude'] = pandas.to_numeric(df_WF.Latitude, errors = 'coerce')
+    if len(df_WF) > 0:
+        df_WF['Longitude'] = pandas.to_numeric(df_WF.Longitude, errors = 'coerce')
+        df_WF['Latitude'] = pandas.to_numeric(df_WF.Latitude, errors = 'coerce')
+        
     df_SS = df[(df.Category == 'Severe Storms') & (df.DATE >= datetime.datetime.now() - dateutil.relativedelta.relativedelta(months=1))]
-    df_SS['Longitude'] = pandas.to_numeric(df_SS.Longitude, errors = 'coerce')
-    df_SS['Latitude'] = pandas.to_numeric(df_SS.Latitude, errors = 'coerce')  
+    if len(df_SS) > 0:
+        df_SS['Longitude'] = pandas.to_numeric(df_SS.Longitude, errors = 'coerce')
+        df_SS['Latitude'] = pandas.to_numeric(df_SS.Latitude, errors = 'coerce')
+        
+    df_LS = df[(df.Category == 'Landslides') & (df.DATE >= datetime.datetime.now() - dateutil.relativedelta.relativedelta(months=1))]
+    if len(df_LS) > 0:
+        df_LS['Longitude'] = pandas.to_numeric(df_LS.Longitude, errors = 'coerce')
+        df_LS['Latitude'] = pandas.to_numeric(df_LS.Latitude, errors = 'coerce')
+        
     writer = pandas.ExcelWriter(os.path.join(os.getcwd(), 'TEMP') + '\\' + datetime.datetime.strftime(datetime.datetime.now(),dateformat) + '_' + 'EONET_REPORT.xlsx' ,engine='xlsxwriter')
     df_SS.to_excel(writer,sheet_name = 'Severe Storms', index=False)
     df_WF.to_excel(writer,sheet_name = 'Wildfires', index=False)
+    df_LS.to_excel(writer,sheet_name = 'Landslides', index=False)
     writer.save()
-    plotmaps(df_WF, df_SS)
+    plotmaps(df_WF, df_SS, df_LS)
     
 def folderCreate():
     try:
@@ -298,6 +319,7 @@ def main(eMail):                    #Main is used to control program flow.
         report()
         mail(eMail)
         folderCreate() #Cleanup
+        conn.close()
         print("Data has been extracted, the program will now quit.")
     else:
         print('E-MAIL VALIDATION ERROR :: ')
