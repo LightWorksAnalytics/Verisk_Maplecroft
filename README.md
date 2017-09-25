@@ -14,6 +14,7 @@ Once the data is stored in the EONET_DB, it is then extracted and transformed in
     
     Wildfires
     Severe Storms
+    Landslides
     
 Both dataframes will be subsetted to the current month period only. The subsetting data is then saved on individual sheets inside a xlsx file. 
 which is saved within the temp folder.
